@@ -9,11 +9,12 @@ class RequirementResponse(BaseModel):
 
 
 class ScoreRequest(BaseModel):
-    responses: List[RequirementResponse] = Field(..., min_length=1, max_length=5)
+    responses: List[RequirementResponse] = Field(..., min_length=10, max_length=10)
 
 
 class RequirementOut(BaseModel):
     id: int
+    rfp_title: str
     requirement: str
 
     class Config:
