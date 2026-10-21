@@ -9,7 +9,7 @@ from .schemas import RequirementOut, ScoreRequest, ScoreResult
 app = FastAPI(
     title="RFP Validation API",
     description="Validate Cisco partner responses against RFP requirements.",
-    version="1.1.0",
+    version="1.2.0",
 )
 
 
@@ -74,6 +74,47 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/rfp/titles", response_model=list[str])
+def get_rfp_titles(db: Session = Depends(get_db)):
+    """Return distinct RFP titles for the frontend selection screen."""
+    titles = (
+        db.query(RFP.rfp_title)
+        .filter(RFP.rfp_title.isnot(None))
+        .distinct()
+        .order_by(RFP.rfp_title)
+        .all()
+    )
+    return [title[0] for title in titles]
+
+
+@app.get("/rfp/{rfp_title}/requirements", response_model=list[RequirementOut])
+def get_random_requirements_for_title(
+    rfp_title: str,
+    db: Session = Depends(get_db),
+):
+    """Return 10 random requirements belonging only to the selected RFP title."""
+    query = db.query(RFP).filter(RFP.rfp_title == rfp_title)
+    requirement_count = query.count()
+
+    if requirement_count == 0:
+        raise HTTPException(
+            status_code=404,
+            detail=f"RFP title not found: {rfp_title}",
+        )
+
+    if requirement_count < 10:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"RFP '{rfp_title}' has only {requirement_count} requirements; "
+                "at least 10 are required."
+            ),
+        )
+
+    return query.order_by(func.random()).limit(10).all()
+
+
+# Backward-compatible endpoint: returns 10 random requirements from all RFPs.
 @app.get("/rfp/requirements", response_model=list[RequirementOut])
 def get_random_requirements(db: Session = Depends(get_db)):
     if db.query(RFP).count() < 10:
@@ -81,7 +122,6 @@ def get_random_requirements(db: Session = Depends(get_db)):
             status_code=500,
             detail="At least 10 RFP requirements are required.",
         )
-
     return db.query(RFP).order_by(func.random()).limit(10).all()
 
 
