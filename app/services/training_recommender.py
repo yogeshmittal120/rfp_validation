@@ -36,7 +36,9 @@ def recommend_training(
 
     collection = _get_collection()
     if collection.count() == 0:
-        return []
+        raise RuntimeError(
+            "Training index is empty. Run `python -m scripts.ingest_training` first."
+        )
 
     best_by_id: dict[str, dict[str, Any]] = {}
     per_requirement = max(3, min(top_k, 5))
