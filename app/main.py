@@ -9,7 +9,7 @@ from .schemas import RequirementOut, ScoreRequest, ScoreResult
 app = FastAPI(
     title="RFP Validation API",
     description="Validate Cisco partner responses against RFP requirements.",
-    version="1.2.0",
+    version="1.3.0",
 )
 
 
@@ -37,34 +37,70 @@ def ensure_database_schema():
 
 
 def seed_database():
+    """Seed three sample RFPs, adding only titles that are not already present."""
+    sample_rfps = {
+        "Cisco Partner RFP": [
+            ("The solution must support 24x7 technical support.", "YES"),
+            ("The solution must provide role-based access control.", "YES"),
+            ("The solution must support on-premises deployment.", "NO"),
+            ("The solution must provide REST APIs.", "YES"),
+            ("The solution must support IPv6.", "YES"),
+            ("The solution must include automated backup.", "NO"),
+            ("The solution must support multi-factor authentication.", "YES"),
+            ("The solution must provide a mobile application.", "NO"),
+            ("The solution must support high availability.", "YES"),
+            ("The solution must provide real-time monitoring.", "YES"),
+        ],
+        "Network Security RFP": [
+            ("The solution must provide a network firewall.", "YES"),
+            ("The solution must detect and prevent network intrusions.", "YES"),
+            ("The solution must support VPN connectivity.", "YES"),
+            ("The solution must provide centralized security logging.", "YES"),
+            ("The solution must support network traffic encryption.", "YES"),
+            ("The solution must include a built-in email marketing tool.", "NO"),
+            ("The solution must support security policy management.", "YES"),
+            ("The solution must provide real-time threat alerts.", "YES"),
+            ("The solution must support integration with SIEM platforms.", "YES"),
+            ("The solution must require all administration to be done manually.", "NO"),
+        ],
+        "Cloud Infrastructure RFP": [
+            ("The solution must support deployment on a public cloud.", "YES"),
+            ("The solution must support automated resource scaling.", "YES"),
+            ("The solution must provide infrastructure monitoring.", "YES"),
+            ("The solution must support automated backups.", "YES"),
+            ("The solution must provide role-based access control.", "YES"),
+            ("The solution must require physical servers for every deployment.", "NO"),
+            ("The solution must support disaster recovery.", "YES"),
+            ("The solution must provide usage and cost reporting.", "YES"),
+            ("The solution must support encrypted data storage.", "YES"),
+            ("The solution must disable audit logging by default.", "NO"),
+        ],
+    }
+
     db = SessionLocal()
     try:
-        if db.query(RFP).count() == 0:
-            rfp_title = "Cisco Partner RFP"
-            sample_data = [
-                ("The solution must support 24x7 technical support.", "YES"),
-                ("The solution must provide role-based access control.", "YES"),
-                ("The solution must support on-premises deployment.", "NO"),
-                ("The solution must provide REST APIs.", "YES"),
-                ("The solution must support IPv6.", "YES"),
-                ("The solution must include automated backup.", "NO"),
-                ("The solution must support multi-factor authentication.", "YES"),
-                ("The solution must provide a mobile application.", "NO"),
-                ("The solution must support high availability.", "YES"),
-                ("The solution must provide real-time monitoring.", "YES"),
-            ]
+        existing_titles = {
+            title
+            for (title,) in db.query(RFP.rfp_title).distinct().all()
+            if title is not None
+        }
+
+        for title, requirements in sample_rfps.items():
+            if title in existing_titles:
+                continue
 
             db.add_all(
                 [
                     RFP(
-                        rfp_title=rfp_title,
+                        rfp_title=title,
                         requirement=requirement,
                         cisco_partner_response=response,
                     )
-                    for requirement, response in sample_data
+                    for requirement, response in requirements
                 ]
             )
-            db.commit()
+
+        db.commit()
     finally:
         db.close()
 
