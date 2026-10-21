@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import Depends, FastAPI, HTTPException
 from sqlalchemy import func, inspect, text
 from sqlalchemy.orm import Session
@@ -5,11 +7,14 @@ from sqlalchemy.orm import Session
 from .database import Base, SessionLocal, engine, get_db
 from .models import RFP
 from .schemas import RequirementOut, ScoreRequest, ScoreResult
+from .services.training_recommender import recommend_training
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="RFP Validation API",
-    description="Validate Cisco partner responses against RFP requirements.",
-    version="1.3.0",
+    description="Validate Cisco partner responses against RFP requirements and recommend relevant training.",
+    version="1.4.0",
 )
 
 
@@ -189,14 +194,31 @@ def calculate_score(payload: ScoreRequest, db: Session = Depends(get_db)):
 
     record_by_id = {record.id: record for record in records}
     correct_answers = 0
+    failed_requirements = []
 
     for item in payload.responses:
-        expected = record_by_id[item.id].cisco_partner_response.upper()
+        record = record_by_id[item.id]
+        expected = record.cisco_partner_response.upper()
         if item.response.upper() == expected:
             correct_answers += 1
+        else:
+            failed_requirements.append(record.requirement)
 
     incorrect_answers = 10 - correct_answers
     percentage = (correct_answers / 10) * 100
+    recommendation_status = "not_needed"
+    recommendations = []
+
+    if percentage < 70:
+        try:
+            recommendations = recommend_training(failed_requirements)
+            recommendation_status = (
+                "recommendations_available" if recommendations else "no_relevant_training"
+            )
+        except Exception:
+            # Scoring remains available even if the local training index is not ready.
+            logger.exception("Training recommendation lookup failed")
+            recommendation_status = "index_not_ready"
 
     return ScoreResult(
         total_questions=10,
@@ -204,4 +226,6 @@ def calculate_score(payload: ScoreRequest, db: Session = Depends(get_db)):
         incorrect_answers=incorrect_answers,
         score=correct_answers * 10,
         percentage=percentage,
+        training_recommendation_status=recommendation_status,
+        training_recommendations=recommendations,
     )
