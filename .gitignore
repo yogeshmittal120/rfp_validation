@@ -9,3 +9,7 @@ rfp.db
 
 # Local training Excel files (do not commit)
 *.xlsx
+
+# Local vector database and model/cache files
+chroma_db/
+.chroma/
