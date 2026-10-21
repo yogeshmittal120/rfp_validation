@@ -6,3 +6,6 @@ venv/
 rfp.db
 .pytest_cache/
 .coverage
+
+# Local training Excel files (do not commit)
+*.xlsx
